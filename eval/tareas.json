@@ -1,0 +1,123 @@
+{
+  "descripcion": "Banco de evaluación de Lupa. Las respuestas esperadas NO están escritas a mano: se calculan en el momento con una consulta directa a la API de datos.gov.co, así siguen siendo correctas aunque los datos se actualicen.",
+  "tareas": [
+    {
+      "id": "S1",
+      "nivel": "simple",
+      "pregunta": "¿Cuál fue la TRM vigente el 2 de enero de 2025?",
+      "tools_esperadas": ["consultar_dataset"],
+      "verificaciones": [
+        {"tipo": "numero", "consultas": {"x": {"dataset": "32sa-8pi3", "select": "valor AS v", "where": "vigenciadesde <= '2025-01-02' AND vigenciahasta >= '2025-01-02'"}}, "expresion": "x", "tolerancia": 0.001}
+      ]
+    },
+    {
+      "id": "S2",
+      "nivel": "simple",
+      "pregunta": "¿Cuál fue la TRM promedio de octubre de 2025?",
+      "tools_esperadas": ["consultar_dataset"],
+      "verificaciones": [
+        {"tipo": "numero", "consultas": {"x": {"dataset": "32sa-8pi3", "select": "avg(valor) AS v", "where": "vigenciadesde between '2025-10-01' and '2025-10-31'"}}, "expresion": "x", "tolerancia": 0.01}
+      ]
+    },
+    {
+      "id": "S3",
+      "nivel": "simple",
+      "pregunta": "¿Cuántos contratos firmó en 2025 la Secretaría de Infraestructura de la Gobernación del Valle según SECOP II?",
+      "tools_esperadas": ["consultar_dataset"],
+      "verificaciones": [
+        {"tipo": "numero", "consultas": {"x": {"dataset": "jbjy-vk9h", "select": "count(*) AS v", "where": "nombre_entidad = 'SECRETARIA DE INFRAESTRUCTURA - GOBERNACION DEL VALLE' AND fecha_de_firma between '2025-01-01T00:00:00' and '2025-12-31T23:59:59'"}}, "expresion": "x", "tolerancia": 0.001}
+      ]
+    },
+    {
+      "id": "S4",
+      "nivel": "simple",
+      "pregunta": "¿Qué conjunto de datos de datos.gov.co tiene los resultados de las pruebas Saber 11? Dame su nombre y su id.",
+      "tools_esperadas": ["buscar_datasets"],
+      "verificaciones": [
+        {"tipo": "contiene", "textos": ["kgxf-xxbe"]}
+      ]
+    },
+    {
+      "id": "M1",
+      "nivel": "varios_pasos",
+      "pregunta": "Si compré 1.000 dólares el 2 de enero de 2025 y los vendí el 30 de diciembre de 2025, ¿cuánto gané o perdí en pesos, usando la TRM de cada día?",
+      "tools_esperadas": ["consultar_dataset", "calculadora"],
+      "verificaciones": [
+        {"tipo": "numero", "consultas": {
+          "a": {"dataset": "32sa-8pi3", "select": "valor AS v", "where": "vigenciadesde <= '2025-01-02' AND vigenciahasta >= '2025-01-02'"},
+          "b": {"dataset": "32sa-8pi3", "select": "valor AS v", "where": "vigenciadesde <= '2025-12-30' AND vigenciahasta >= '2025-12-30'"}
+        }, "expresion": "1000 * (b - a)", "absoluto": true, "tolerancia": 0.005}
+      ]
+    },
+    {
+      "id": "M2",
+      "nivel": "varios_pasos",
+      "pregunta": "¿En qué mes de 2025 fue más alta la TRM promedio y cuál fue ese promedio?",
+      "tools_esperadas": ["consultar_dataset"],
+      "verificaciones": [
+        {"tipo": "numero", "consultas": {"x": {"dataset": "32sa-8pi3", "select": "date_trunc_ym(vigenciadesde) AS mes, avg(valor) AS v", "where": "vigenciadesde between '2025-01-01' and '2025-12-31'", "group": "mes", "order": "v DESC", "limit": 1}}, "expresion": "x", "tolerancia": 0.01},
+        {"tipo": "contiene", "textos": ["enero"]}
+      ]
+    },
+    {
+      "id": "M3",
+      "nivel": "varios_pasos",
+      "pregunta": "¿Cuánto sumaron en 2025 los contratos firmados en SECOP II por la Secretaría de Salud de la Gobernación del Valle del Cauca?",
+      "tools_esperadas": ["consultar_dataset"],
+      "verificaciones": [
+        {"tipo": "numero", "consultas": {"x": {"dataset": "jbjy-vk9h", "select": "sum(valor_del_contrato) AS v", "where": "nombre_entidad = 'GOBERNACIÓN VALLE DEL CAUCA -SECRETARIA DE SALUD' AND fecha_de_firma between '2025-01-01T00:00:00' and '2025-12-31T23:59:59'"}}, "expresion": "x", "tolerancia": 0.01}
+      ]
+    },
+    {
+      "id": "M4",
+      "nivel": "varios_pasos",
+      "pregunta": "Grafica la TRM promedio mensual de 2025.",
+      "tools_esperadas": ["consultar_dataset", "ejecutar_python"],
+      "verificaciones": [
+        {"tipo": "dataset", "id": "32sa-8pi3"},
+        {"tipo": "grafica"}
+      ]
+    },
+    {
+      "id": "C1",
+      "nivel": "compleja",
+      "pregunta": "¿Cuánto contrató en total la Gobernación del Valle del Cauca, sumando todas sus dependencias, por SECOP II en 2025? Muestra en una gráfica las 5 dependencias con mayor valor contratado.",
+      "tools_esperadas": ["consultar_dataset", "ejecutar_python"],
+      "verificaciones": [
+        {"tipo": "numero", "consultas": {"x": {"dataset": "jbjy-vk9h", "select": "sum(valor_del_contrato) AS v", "where": "departamento = 'Valle del Cauca' AND upper(nombre_entidad) like '%GOBERNACI%' AND fecha_de_firma between '2025-01-01T00:00:00' and '2025-12-31T23:59:59'"}}, "expresion": "x", "tolerancia": 0.01},
+        {"tipo": "grafica"}
+      ]
+    },
+    {
+      "id": "C2",
+      "nivel": "compleja",
+      "pregunta": "Compara el puntaje global promedio de Saber 11 entre colegios oficiales y no oficiales del Valle del Cauca en 2019. ¿Cuál es la diferencia entre ambos?",
+      "tools_esperadas": ["consultar_dataset", "calculadora"],
+      "verificaciones": [
+        {"tipo": "numero", "consultas": {"x": {"dataset": "kgxf-xxbe", "select": "avg(punt_global::number) AS v", "where": "cole_depto_ubicacion = 'VALLE' AND starts_with(periodo, '2019') AND cole_naturaleza = 'OFICIAL'"}}, "expresion": "x", "tolerancia": 0.01},
+        {"tipo": "numero", "consultas": {"x": {"dataset": "kgxf-xxbe", "select": "avg(punt_global::number) AS v", "where": "cole_depto_ubicacion = 'VALLE' AND starts_with(periodo, '2019') AND cole_naturaleza = 'NO OFICIAL'"}}, "expresion": "x", "tolerancia": 0.01}
+      ]
+    },
+    {
+      "id": "C3",
+      "nivel": "compleja",
+      "pregunta": "Grafica la TRM promedio mensual de 2025 y busca en la web qué factores explicaron el comportamiento del dólar en Colombia ese año. Cita las fuentes.",
+      "tools_esperadas": ["consultar_dataset", "ejecutar_python", "buscar_web"],
+      "verificaciones": [
+        {"tipo": "dataset", "id": "32sa-8pi3"},
+        {"tipo": "grafica"},
+        {"tipo": "web"}
+      ]
+    },
+    {
+      "id": "C4",
+      "nivel": "compleja",
+      "pregunta": "¿Qué datos abiertos hay sobre calidad del aire en Bogotá? Elige el conjunto más útil, consulta sus registros más recientes y resume qué muestran.",
+      "tools_esperadas": ["buscar_datasets", "consultar_dataset"],
+      "verificaciones": [
+        {"tipo": "tools_exitosas", "tools": ["buscar_datasets", "consultar_dataset"]},
+        {"tipo": "contiene", "textos": ["datos.gov.co/d/"]}
+      ]
+    }
+  ]
+}
