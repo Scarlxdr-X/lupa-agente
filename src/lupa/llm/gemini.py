@@ -19,6 +19,8 @@ Detalles que este módulo resuelve:
 from __future__ import annotations
 
 import logging
+import re
+import time
 from typing import Any
 
 from google import genai
@@ -27,6 +29,7 @@ from google.genai import errors, types
 from .base import (
     DefinicionTool,
     ErrorConfiguracion,
+    ErrorLLM,
     LlamadaTool,
     Mensaje,
     ProveedorLLM,
@@ -45,6 +48,35 @@ _CODIGOS_TEMPORALES = {429, 500, 502, 503, 504}
 # (historial que viene de otro modelo). Es el "último recurso" de la documentación.
 FIRMA_SIN_VALIDAR = b"skip_thought_signature_validator"
 
+# Si el límite por minuto pide esperar hasta esto, se espera en vez de cambiar de modelo.
+_ESPERA_MAXIMA_S = 65
+
+
+class ErrorCuotaAgotada(ErrorLLM):
+    """Todos los modelos de Gemini agotaron su cuota diaria. No se reintenta."""
+
+    def __init__(self, agotados: set[str]) -> None:
+        super().__init__(
+            "Se agotó la cuota diaria gratuita de todos los modelos de Gemini configurados "
+            f"({', '.join(sorted(agotados))}). Se reinicia a la medianoche del Pacífico "
+            "(3:00 a. m. en Colombia). Mientras tanto, usa la clave de otro proyecto o activa la facturación."
+        )
+
+
+def tipo_de_limite(error: Exception) -> tuple[str, float | None]:
+    """Lee un error 429 de Gemini: ¿cuota diaria o por minuto?, y cuántos segundos pide esperar.
+
+    El mensaje trae el id de la cuota (ej. GenerateRequestsPerDayPerProjectPerModel-FreeTier)
+    y una sugerencia como "Please retry in 33.5s" o "retryDelay": "33s".
+    """
+    texto = str(error)
+    espera = re.search(r"retry in ([\d.]+)\s*s", texto, re.IGNORECASE) or re.search(
+        r"retryDelay['\"]?\s*:\s*['\"]([\d.]+)s", texto
+    )
+    segundos = float(espera.group(1)) if espera else None
+    tipo = "diaria" if re.search(r"PerDay|per day", texto, re.IGNORECASE) else "minuto"
+    return tipo, segundos
+
 
 class ProveedorGemini(ProveedorLLM):
     nombre = "gemini"
@@ -60,6 +92,9 @@ class ProveedorGemini(ProveedorLLM):
         super().__init__(modelo, **kwargs)
         #: Modelo principal seguido de los de respaldo, sin repetidos.
         self.modelos = list(dict.fromkeys([modelo, *(modelos_respaldo or [])]))
+        #: Modelos que agotaron su cuota diaria en esta sesión (no se vuelven a intentar).
+        self.agotados: set[str] = set()
+        self.dormir = time.sleep
         if cliente is None:
             if not api_key:
                 raise ErrorConfiguracion(
@@ -79,9 +114,16 @@ class ProveedorGemini(ProveedorLLM):
             tools=[self._a_tool(tools)] if tools else None,
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
         )
-        # Primero el modelo actual; si está saturado o sin cuota, los de respaldo en orden.
-        candidatos = [self.modelo, *(m for m in self.modelos if m != self.modelo)]
-        for i, modelo in enumerate(candidatos):
+        # Primero el modelo actual; luego los de respaldo en orden, saltando los
+        # que ya agotaron su cuota diaria en esta sesión.
+        candidatos = [m for m in [self.modelo, *self.modelos] if m not in self.agotados]
+        candidatos = list(dict.fromkeys(candidatos))
+        if not candidatos:
+            raise ErrorCuotaAgotada(self.agotados)
+
+        i, ya_espero = 0, False
+        while i < len(candidatos):
+            modelo = candidatos[i]
             try:
                 respuesta = self.cliente.models.generate_content(
                     model=modelo,
@@ -89,10 +131,27 @@ class ProveedorGemini(ProveedorLLM):
                     config=config,
                 )
             except errors.APIError as exc:
-                if exc.code in _CODIGOS_TEMPORALES and i + 1 < len(candidatos):
-                    log.warning("%s no está disponible (error %s). Pruebo con %s.", modelo, exc.code, candidatos[i + 1])
-                    continue
-                raise
+                if exc.code not in _CODIGOS_TEMPORALES:
+                    raise
+                siguiente = candidatos[i + 1] if i + 1 < len(candidatos) else None
+                if exc.code == 429:
+                    tipo, segundos = tipo_de_limite(exc)
+                    if tipo == "diaria":
+                        self.agotados.add(modelo)
+                        log.warning("Se agotó la cuota diaria de %s; no lo vuelvo a usar en esta sesión.", modelo)
+                        if siguiente is None and len(self.agotados) >= len(self.modelos):
+                            raise ErrorCuotaAgotada(self.agotados) from exc
+                    elif not ya_espero and segundos is not None and segundos <= _ESPERA_MAXIMA_S:
+                        # Límite por minuto: esperar un poco sale más barato que gastar otro modelo.
+                        log.warning("%s llegó a su límite por minuto; espero %.0f s y repito.", modelo, segundos + 1)
+                        self.dormir(segundos + 1)
+                        ya_espero = True
+                        continue
+                if siguiente is None:
+                    raise
+                log.warning("%s no está disponible (error %s). Pruebo con %s.", modelo, exc.code, siguiente)
+                i, ya_espero = i + 1, False
+                continue
             if modelo != self.modelo:
                 log.warning("Lupa sigue con el modelo %s (antes %s).", modelo, self.modelo)
                 self.modelo = modelo

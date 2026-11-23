@@ -136,7 +136,7 @@ def construir_app(config: Config | None = None) -> gr.Blocks:
         estado = gr.State(None)
         with gr.Row():
             with gr.Column(scale=3):
-                chat = gr.Chatbot(label="Conversación", height=560)
+                chat = gr.Chatbot(label="Conversación", height=560, latex_delimiters=[])
                 entrada = gr.Textbox(label="Tu pregunta", placeholder="Ej.: ¿Cuál fue la TRM promedio de octubre de 2025?")
                 with gr.Row():
                     enviar = gr.Button("Preguntar", variant="primary")

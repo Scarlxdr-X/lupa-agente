@@ -35,6 +35,8 @@ Cuando la pregunta pide cifras: totales, conteos, promedios, comparaciones, rank
    colombiano = 10^12).
 
 ## Errores comunes
+- Error `column-not-in-group-bys`: toda columna del `select` que no esté dentro de `count`, `sum` o `avg`
+  debe ir también en `group`.
 - Confundir número de contratos con valor de los contratos.
 - Promediar promedios de grupos de distinto tamaño sin ponderar.
 - Usar `fecha_de_inicio_del_contrato` cuando se pregunta por contratos firmados (`fecha_de_firma`).

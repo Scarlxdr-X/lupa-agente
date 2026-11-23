@@ -207,3 +207,65 @@ def test_config_lee_los_modelos_de_respaldo(monkeypatch):
 
     monkeypatch.setenv("LUPA_MODELOS_RESPALDO_GEMINI", "m1, m2,,m3")
     assert Config.cargar().modelos_respaldo_gemini == ("m1", "m2", "m3")
+
+
+def error_429(cuota, segundos=20):
+    return errors.ClientError(429, {"error": {"code": 429, "status": "RESOURCE_EXHAUSTED", "message": (
+        f"You exceeded your current quota. Quota exceeded for metric: free_tier_requests, quotaId: {cuota}. "
+        f"Please retry in {segundos}.5s.")}})
+
+
+class ModelosConErrores(ModelosFalsos):
+    """Cada modelo devuelve, en orden, los errores de su lista y luego las respuestas."""
+
+    def __init__(self, respuestas, errores_por_modelo):
+        super().__init__(respuestas)
+        self.errores = {m: list(e) for m, e in errores_por_modelo.items()}
+
+    def generate_content(self, model, contents, config):
+        self.peticiones.append({"model": model, "contents": contents, "config": config})
+        if self.errores.get(model):
+            raise self.errores[model].pop(0)
+        return self.respuestas.pop(0)
+
+
+def test_distingue_cuota_diaria_y_por_minuto():
+    from lupa.llm.gemini import tipo_de_limite
+
+    assert tipo_de_limite(error_429("GenerateRequestsPerDayPerProjectPerModel-FreeTier")) == ("diaria", 20.5)
+    assert tipo_de_limite(error_429("GenerateRequestsPerMinutePerProjectPerModel-FreeTier", 7)) == ("minuto", 7.5)
+
+
+def test_limite_por_minuto_espera_y_repite_el_mismo_modelo():
+    modelos = ModelosConErrores([respuesta_texto("listo")],
+                                {"a": [error_429("GenerateRequestsPerMinutePerProjectPerModel-FreeTier", 7)]})
+    llm = ProveedorGemini(None, modelo="a", modelos_respaldo=["b"], cliente=SimpleNamespace(models=modelos),
+                          max_reintentos=0)
+    esperas = []
+    llm.dormir = esperas.append
+    assert llm.generar([Mensaje.usuario("hola")]).texto == "listo"
+    assert [p["model"] for p in modelos.peticiones] == ["a", "a"]
+    assert esperas == [8.5]
+
+
+def test_cuota_diaria_agotada_no_se_vuelve_a_intentar():
+    diaria = error_429("GenerateRequestsPerDayPerProjectPerModel-FreeTier")
+    modelos = ModelosConErrores([respuesta_texto("uno"), respuesta_texto("dos")], {"a": [diaria]})
+    llm = ProveedorGemini(None, modelo="a", modelos_respaldo=["b"], cliente=SimpleNamespace(models=modelos),
+                          max_reintentos=0)
+    llm.generar([Mensaje.usuario("hola")])
+    llm.modelo = "a"  # aunque se vuelva a pedir el principal, ya no se intenta
+    llm.generar([Mensaje.usuario("hola")])
+    assert [p["model"] for p in modelos.peticiones] == ["a", "b", "b"]
+
+
+def test_todas_las_cuotas_diarias_agotadas_da_error_claro():
+    from lupa.llm.gemini import ErrorCuotaAgotada
+
+    diaria = lambda: error_429("GenerateRequestsPerDayPerProjectPerModel-FreeTier")  # noqa: E731
+    modelos = ModelosConErrores([], {"a": [diaria()], "b": [diaria()]})
+    llm = ProveedorGemini(None, modelo="a", modelos_respaldo=["b"], cliente=SimpleNamespace(models=modelos),
+                          max_reintentos=3)
+    with pytest.raises(ErrorCuotaAgotada, match="3:00 a. m."):
+        llm.generar([Mensaje.usuario("hola")])
+    assert len(modelos.peticiones) == 2  # no se reintenta en vano

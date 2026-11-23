@@ -10,7 +10,8 @@ tools: [buscar_datasets, consultar_dataset]
 Siempre que la pregunta necesite datos y todavía no sepas qué conjunto usar, o no conozcas sus columnas.
 
 ## Pasos
-1. **Revisa primero la tabla de conjuntos verificados** (abajo). Si el tema está ahí, usa ese id directamente.
+1. **Revisa primero la tabla de conjuntos verificados** (abajo). Si el tema está ahí, usa ese id y esas columnas
+   directamente: **no llames a `buscar_datasets`** ni inventes nombres de columnas que no estén en la tabla.
 2. Si no está, llama a `buscar_datasets` con 2 a 4 palabras clave en español. Si no hay resultados, prueba sinónimos
    ("contratación" o "secop" en vez de "compras públicas"; "calidad del aire" o "pm2.5" en vez de "contaminación").
 3. Elige el conjunto: entidad oficial, actualización reciente y columnas que respondan la pregunta. Si hay una
@@ -23,7 +24,7 @@ Siempre que la pregunta necesite datos y todavía no sepas qué conjunto usar, o
 
 | Tema | id | Columnas clave | Cómo consultarlo |
 | --- | --- | --- | --- |
-| Contratos públicos (SECOP II) | `jbjy-vk9h` | nombre_entidad, departamento, ciudad, fecha_de_firma, valor_del_contrato, tipo_de_contrato, modalidad_de_contratacion, proveedor_adjudicado, objeto_del_contrato, estado_contrato | Es enorme: filtra SIEMPRE por fecha y por entidad o departamento, y agrupa en el servidor. Los nombres de entidad no están normalizados: usa `upper(nombre_entidad) like '%GOBERNACI%' AND departamento = 'Valle del Cauca'`. |
+| Contratos públicos (SECOP II) | `jbjy-vk9h` | nombre_entidad, departamento, ciudad, fecha_de_firma, valor_del_contrato, tipo_de_contrato, modalidad_de_contratacion, proveedor_adjudicado, objeto_del_contrato, estado_contrato | Es enorme: filtra SIEMPRE por fecha y por entidad o departamento, y agrupa en el servidor. Los nombres de entidad no están normalizados: usa `upper(nombre_entidad) like '%GOBERNACI%' AND departamento = 'Valle del Cauca'`. **No hay columna de dependencia**: cada secretaría de una gobernación o alcaldía aparece como un `nombre_entidad` distinto, así que "por dependencia" = `group="nombre_entidad"`. |
 | TRM (dólar en pesos) | `32sa-8pi3` | valor, vigenciadesde, vigenciahasta | Una fila por periodo de vigencia (un fin de semana es una sola fila). TRM de un día D: `where="vigenciadesde <= 'D' AND vigenciahasta >= 'D'"`. Promedio mensual: `select="date_trunc_ym(vigenciadesde) AS mes, avg(valor) AS trm"`, `group="mes"`, `order="mes"`. |
 | Resultados Saber 11 (2010-2022) | `kgxf-xxbe` | periodo (ej. '20194'), cole_depto_ubicacion (ej. 'VALLE'), cole_mcpio_ubicacion, cole_naturaleza ('OFICIAL' / 'NO OFICIAL'), punt_global, punt_matematicas, punt_ingles | Todos los puntajes son texto: `avg(punt_global::number)`. Año: `starts_with(periodo, '2019')`. |
 | Tasas de interés de crédito (histórico) | `w9zh-vetq` | fecha_corte, tipo_de_cr_dito, producto_de_cr_dito, tasa_efectiva_promedio, montos_desembolsados | Los dos últimos meses están en `qzsc-9esp`. Pondera las tasas por monto si promedias. |

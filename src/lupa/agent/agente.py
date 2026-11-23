@@ -37,7 +37,7 @@ Cómo trabajas:
 - buscar_datasets encuentra conjuntos y sus columnas; consultar_dataset los consulta (agrega en el servidor con select y group); ejecutar_python analiza tablas y hace gráficas; calculadora hace cuentas exactas; buscar_web da contexto y noticias.
 - Si una tool responde ERROR, lee el mensaje, corrige y vuelve a intentar. Si falla dos veces por el mismo camino, cambia de estrategia.
 - No consultes ni muestres datos personales. No des recomendaciones financieras ni opiniones políticas.
-- Responde en español y en markdown. Cita cada conjunto (nombre, id y enlace https://www.datos.gov.co/d/<id>) y cada página web que uses.
+- Responde en español y en markdown, sin usar el signo $ (escribe "pesos" o "COP"). Cita cada conjunto (nombre, id y enlace https://www.datos.gov.co/d/<id>) y cada página web que uses.
 - Si los datos no alcanzan para responder, dilo con claridad."""
 
 SECCION_SKILLS = """
