@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lupa"
+version = "0.1.0"
+description = "Lupa: agente que analiza los datos abiertos de Colombia (datos.gov.co) con tools y skills"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "Adrián Campos" },
+    { name = "David Celorio" },
+    { name = "Martín Murillo" },
+]
+dependencies = [
+    "google-genai>=3.0",     # LLM principal: Gemini
+    "openai>=3.0",           # LLM de respaldo: Groq u otra API compatible con OpenAI
+    "python-dotenv>=1.0",    # lee las claves desde .env
+    "requests>=2.31",        # llamadas HTTP a datos.gov.co y Tavily
+    "pandas>=2.0",           # tablas que devuelve consultar_dataset
+    "matplotlib>=3.7",       # gráficas de ejecutar_python y de la evaluación
+    "pyyaml>=6.0",           # encabezados de los SKILL.md
+    "gradio>=6.0",           # interfaz web
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+lupa-verificar = "lupa.verificacion:main"
+lupa-preguntar = "lupa.cli:main"
+lupa-app = "lupa.ui.app:main"
+lupa-evaluar = "lupa.evaluacion:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# Los prompts y los datos de prueba son texto largo a propósito
+"src/lupa/agent/agente.py" = ["E501"]
+"src/lupa/ui/app.py" = ["E501"]
+"src/lupa/tools/datos_gov.py" = ["E501"]
+"src/lupa/evaluacion.py" = ["E501"]
+"tests/*" = ["E501"]

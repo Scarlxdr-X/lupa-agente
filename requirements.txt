@@ -1,0 +1,7 @@
+# Las dependencias están definidas en pyproject.toml.
+# Esta línea instala el paquete `lupa` en modo editable junto con las
+# dependencias de desarrollo (pytest):
+#
+#   pip install -r requirements.txt
+#
+-e .[dev]

@@ -1,0 +1,17 @@
+# Claves: nunca se suben
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# Jupyter / Colab
+.ipynb_checkpoints/
+
+# Archivos que genera el agente al ejecutarse
+cache/
+salidas/
