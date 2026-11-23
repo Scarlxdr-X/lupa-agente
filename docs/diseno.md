@@ -113,13 +113,13 @@ Configuraciones: A, agente sin skills (mismas tools, mismo modelo); B, agente co
 | Datos | API SODA de datos.gov.co | Pública, sin clave |
 | Análisis y gráficas | pandas y matplotlib | Estándar |
 | Interfaz | Gradio | Muestra la traza del agente y corre dentro de Colab |
-| Pruebas | pytest | 85 pruebas sin red ni cuota de API |
+| Pruebas | pytest | 89 pruebas sin red ni cuota de API |
 
 ## Riesgos y mitigaciones
 
 | Riesgo | Mitigación |
 | --- | --- |
-| El LLM gratuito responde con error 429 | Reintentos con espera creciente; proveedor de respaldo con una variable |
+| El LLM gratuito responde con error 429 o el modelo está saturado (503) | Cambio automático a modelos de Gemini de respaldo; reintentos con espera creciente; proveedor de respaldo (Groq) con una variable |
 | La API de datos.gov.co está lenta o caída | Caché local de 24 horas, consultas filtradas, tiempo límite y video de respaldo |
 | El código que genera el LLM falla o hace algo indebido | Proceso aparte con tiempo límite y carpeta propia; operaciones peligrosas rechazadas; el error vuelve al agente |
 | El agente inventa cifras | Toda cifra sale de una tool; el informe cita conjunto y consulta; la evaluación mide exactitud |

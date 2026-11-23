@@ -48,7 +48,11 @@ def crear_proveedor(config: Config | None = None, nombre: str | None = None) -> 
     if nombre == "gemini":
         from .gemini import ProveedorGemini
 
-        return ProveedorGemini(api_key=config.gemini_api_key, modelo=config.modelo_gemini)
+        return ProveedorGemini(
+            api_key=config.gemini_api_key,
+            modelo=config.modelo_gemini,
+            modelos_respaldo=list(config.modelos_respaldo_gemini),
+        )
     if nombre == "openai_compat":
         from .openai_compat import ProveedorOpenAICompat
 

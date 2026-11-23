@@ -83,6 +83,7 @@ class Mensaje:
     nombre_tool: str | None = None
     nativo: Any = None
     proveedor: str | None = None
+    modelo: str | None = None
 
     @classmethod
     def usuario(cls, texto: str) -> "Mensaje":

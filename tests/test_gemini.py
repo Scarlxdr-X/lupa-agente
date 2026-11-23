@@ -149,3 +149,61 @@ def test_clasifica_errores_reintentables():
     assert llm._es_reintentable(error_429)
     assert not llm._es_reintentable(error_400)
     assert not llm._es_reintentable(ValueError("otra cosa"))
+
+
+# --- Modelos de respaldo -----------------------------------------------------
+
+
+class ModelosSaturados(ModelosFalsos):
+    """Responde 503 para los modelos de `saturados` y entrega respuestas para el resto."""
+
+    def __init__(self, respuestas, saturados):
+        super().__init__(respuestas)
+        self.saturados = set(saturados)
+
+    def generate_content(self, model, contents, config):
+        self.peticiones.append({"model": model, "contents": contents, "config": config})
+        if model in self.saturados:
+            raise errors.ServerError(503, {"error": {"code": 503, "message": "high demand", "status": "UNAVAILABLE"}})
+        return self.respuestas.pop(0)
+
+
+def test_si_el_modelo_esta_saturado_usa_el_de_respaldo():
+    modelos = ModelosSaturados([respuesta_texto("listo")], saturados={"principal"})
+    llm = ProveedorGemini(None, modelo="principal", modelos_respaldo=["respaldo"],
+                          cliente=SimpleNamespace(models=modelos), max_reintentos=0)
+    r = llm.generar([Mensaje.usuario("hola")])
+    assert r.texto == "listo"
+    assert [p["model"] for p in modelos.peticiones] == ["principal", "respaldo"]
+    assert llm.modelo == "respaldo" and r.mensaje.modelo == "respaldo"
+
+
+def test_si_todos_estan_saturados_se_propaga_el_error():
+    modelos = ModelosSaturados([], saturados={"a", "b"})
+    llm = ProveedorGemini(None, modelo="a", modelos_respaldo=["b", "a"],
+                          cliente=SimpleNamespace(models=modelos), max_reintentos=0)
+    with pytest.raises(errors.ServerError):
+        llm.generar([Mensaje.usuario("hola")])
+    assert [p["model"] for p in modelos.peticiones] == ["a", "b"]  # sin repetir modelos
+
+
+def test_al_cambiar_de_modelo_las_firmas_viejas_se_reemplazan():
+    llm = ProveedorGemini(None, modelo="nuevo", cliente=cliente_falso())
+    viejo = ProveedorGemini(None, modelo="viejo", cliente=cliente_falso())
+    r1 = viejo.desde_respuesta(respuesta_con_llamada("calculadora", {"expresion": "1+1"}))
+    llamada = r1.llamadas[0]
+    historial = [Mensaje.usuario("¿1+1?"), r1.mensaje, Mensaje.resultado_tool(llamada, "2")]
+
+    # Para el mismo modelo, se reenvía tal cual
+    assert viejo.a_contents(historial)[1] is r1.mensaje.nativo
+    # Para otro modelo, la firma original se cambia por la comodín
+    parte = llm.a_contents(historial)[1].parts[0]
+    assert parte.function_call.name == "calculadora"
+    assert parte.thought_signature == b"skip_thought_signature_validator"
+
+
+def test_config_lee_los_modelos_de_respaldo(monkeypatch):
+    from lupa.config import Config
+
+    monkeypatch.setenv("LUPA_MODELOS_RESPALDO_GEMINI", "m1, m2,,m3")
+    assert Config.cargar().modelos_respaldo_gemini == ("m1", "m2", "m3")

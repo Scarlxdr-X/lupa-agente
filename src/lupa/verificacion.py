@@ -107,10 +107,13 @@ def verificar(nombre: str, config: Config, listar_modelos: bool) -> bool:
             print(f"  {FALLA} No se pudieron listar los modelos: {exc}")
 
     try:
-        return prueba_texto(llm) and prueba_tools(llm)
+        ok = prueba_texto(llm) and prueba_tools(llm)
     except Exception as exc:  # noqa: BLE001 - mostramos cualquier error de la API
         print(f"  {FALLA} {type(exc).__name__}: {exc}")
         return False
+    if getattr(llm, "modelos", None) and llm.modelo != llm.modelos[0]:
+        print(f"  Aviso: {llm.modelos[0]} no respondió; se usó el modelo de respaldo {llm.modelo}.")
+    return ok
 
 
 def main(argv: list[str] | None = None) -> int:

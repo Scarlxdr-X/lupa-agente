@@ -18,6 +18,9 @@ from dotenv import load_dotenv
 
 PROVEEDORES_VALIDOS = ("gemini", "openai_compat")
 
+# Modelos de Gemini que se prueban, en orden, si el principal está saturado o sin cuota.
+RESPALDO_GEMINI = "gemini-3.5-flash,gemini-3.8-flash,gemini-3.7-flash,gemini-3.5-flash-lite"
+
 
 def _secreto_de_colab(nombre: str) -> str | None:
     """Devuelve un secreto de Colab, o None si no estamos en Colab o no existe."""
@@ -59,6 +62,7 @@ class Config:
     soda_app_token: str | None
     max_pasos: int
     horas_cache: float = 24
+    modelos_respaldo_gemini: tuple[str, ...] = ()
     carpeta_cache: str = "cache"
     carpeta_salidas: str = "salidas"
 
@@ -83,7 +87,7 @@ class Config:
         return cls(
             proveedor=proveedor,
             gemini_api_key=obtener_valor("GEMINI_API_KEY") or obtener_valor("GOOGLE_API_KEY"),
-            modelo_gemini=obtener_valor("LUPA_MODELO_GEMINI", "gemini-3.7-flash") or "gemini-3.7-flash",
+            modelo_gemini=obtener_valor("LUPA_MODELO_GEMINI", "gemini-3.8-flash") or "gemini-3.8-flash",
             openai_api_key=obtener_valor("LUPA_OPENAI_API_KEY") or obtener_valor("GROQ_API_KEY"),
             openai_base_url=obtener_valor("LUPA_OPENAI_BASE_URL", "https://api.groq.com/openai/v1")
             or "https://api.groq.com/openai/v1",
@@ -92,6 +96,11 @@ class Config:
             soda_app_token=obtener_valor("SODA_APP_TOKEN"),
             max_pasos=max_pasos,
             horas_cache=float(obtener_valor("LUPA_CACHE_HORAS", "24") or 24),
+            modelos_respaldo_gemini=tuple(
+                m.strip()
+                for m in (obtener_valor("LUPA_MODELOS_RESPALDO_GEMINI", RESPALDO_GEMINI) or "").split(",")
+                if m.strip()
+            ),
             carpeta_cache=obtener_valor("LUPA_CARPETA_CACHE", "cache") or "cache",
             carpeta_salidas=obtener_valor("LUPA_CARPETA_SALIDAS", "salidas") or "salidas",
         )
@@ -105,6 +114,8 @@ class Config:
         return {
             "Proveedor activo": self.proveedor,
             "Gemini": f"{estado(self.gemini_api_key)} · modelo {self.modelo_gemini}",
+            "Respaldo de Gemini": ", ".join(m for m in self.modelos_respaldo_gemini if m != self.modelo_gemini)
+            or "ninguno",
             "Compatible con OpenAI": f"{estado(self.openai_api_key)} · {self.modelo_openai} en {self.openai_base_url}",
             "Tavily": estado(self.tavily_api_key),
             "Token de datos.gov.co": "configurado" if self.soda_app_token else "sin token (opcional)",

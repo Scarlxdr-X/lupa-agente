@@ -35,7 +35,7 @@ cp .env.example .env               # Windows: copy .env.example .env  → y pega
 | `lupa-preguntar "¿Cuál fue la TRM promedio de octubre de 2025?"` | Pregunta desde la terminal y muestra cada paso |
 | `lupa-app` | Abre la interfaz web en http://127.0.0.1:7860 (`--share` para un enlace público) |
 | `lupa-evaluar` | Corre el banco de 12 tareas con y sin skills y genera métricas y gráfica |
-| `pytest` | Corre las 85 pruebas (sin internet ni cuota de API) |
+| `pytest` | Corre las 89 pruebas (sin internet ni cuota de API) |
 
 ### Claves
 
@@ -114,13 +114,14 @@ lupa-agente/
 ├── eval/                   tareas.json, evaluar.py y resultados/
 ├── notebooks/              01_verificar_conexion.ipynb, 02_demo_lupa.ipynb
 ├── scripts/                atajos de línea de comandos
-└── tests/                  85 pruebas con pytest
+└── tests/                  89 pruebas con pytest
 ```
 
 ## Detalles técnicos que resolvimos
 
 - **Firmas de pensamiento de Gemini 3**: al usar tools, Gemini exige recibir de vuelta su respuesta original con sus firmas; si se reconstruye a mano responde error 400. La capa de LLM guarda y reenvía la respuesta original, y agrupa en un solo mensaje los resultados de tools pedidas en paralelo.
 - **Límites de la capa gratuita**: los errores 429 y 5xx se reintentan con espera creciente.
+- **Modelos saturados**: si el modelo principal de Gemini responde 503 (alta demanda) o 429 (sin cuota), Lupa pasa solo al siguiente modelo de `LUPA_MODELOS_RESPALDO_GEMINI` sin perder la conversación. Como las firmas de pensamiento solo valen para el modelo que las creó, al cambiar se reenvían con el marcador `skip_thought_signature_validator` que indica la documentación de Gemini.
 - **Datos reales, datos sucios**: nombres de entidades sin normalizar en SECOP II, puntajes guardados como texto en Saber 11 y filtros con `%` que deben codificarse en la URL. Los skills documentan cómo manejarlos.
 - **Privacidad**: SECOP II publica cédulas y cuentas bancarias; Lupa no las consulta ni las muestra.
 

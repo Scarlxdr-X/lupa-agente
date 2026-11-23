@@ -167,8 +167,13 @@ class Agente:
         try:
             for paso in range(1, self.max_pasos + 1):
                 res.pasos = paso
+                modelo_antes = getattr(self.llm, "modelo", None)
                 r = self.llm.generar(mensajes, tools=tools, sistema=self.sistema)
                 self._contar(res, r)
+                if getattr(self.llm, "modelo", None) != modelo_antes:
+                    yield emitir(
+                        Evento("aviso", paso, f"{modelo_antes} no estaba disponible; sigo con {self.llm.modelo}.")
+                    )
 
                 if not r.pide_tools and not r.texto.strip():
                     # Respuesta vacía: se pide la respuesta una vez, sin guardar el mensaje vacío.
