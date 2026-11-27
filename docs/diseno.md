@@ -113,7 +113,7 @@ Configuraciones: A, agente sin skills (mismas tools, mismo modelo); B, agente co
 | Datos | API SODA de datos.gov.co | Pública, sin clave |
 | Análisis y gráficas | pandas y matplotlib | Estándar |
 | Interfaz | Gradio | Muestra la traza del agente y corre dentro de Colab |
-| Pruebas | pytest | 93 pruebas sin red ni cuota de API |
+| Pruebas | pytest | 96 pruebas sin red ni cuota de API |
 
 ## Riesgos y mitigaciones
 

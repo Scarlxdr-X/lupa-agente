@@ -269,3 +269,34 @@ def test_todas_las_cuotas_diarias_agotadas_da_error_claro():
     with pytest.raises(ErrorCuotaAgotada, match="3:00 a. m."):
         llm.generar([Mensaje.usuario("hola")])
     assert len(modelos.peticiones) == 2  # no se reintenta en vano
+
+
+def test_modelo_inexistente_se_salta_y_no_se_vuelve_a_intentar():
+    no_existe = errors.ClientError(404, {"error": {"code": 404, "status": "NOT_FOUND",
+                                                    "message": "This model is no longer available to new users."}})
+    modelos = ModelosConErrores([respuesta_texto("uno"), respuesta_texto("dos")], {"viejo": [no_existe]})
+    llm = ProveedorGemini(None, modelo="viejo", modelos_respaldo=["nuevo"], cliente=SimpleNamespace(models=modelos),
+                          max_reintentos=0)
+    assert llm.generar([Mensaje.usuario("hola")]).texto == "uno"
+    llm.modelo = "viejo"
+    llm.generar([Mensaje.usuario("hola")])
+    assert [p["model"] for p in modelos.peticiones] == ["viejo", "nuevo", "nuevo"]
+
+
+def test_el_cliente_no_reintenta_por_su_cuenta_y_tiene_tiempo_limite():
+    """El SDK reintenta cada 503 hasta 5 veces y sin límite de tiempo: con un modelo
+    saturado la celda parecía colgada. El cambio de modelo lo hace Lupa."""
+    opciones = ProveedorGemini(api_key="clave-falsa").cliente._api_client._http_options
+    assert opciones.retry_options.attempts == 1
+    assert opciones.timeout == 90_000
+
+
+def test_tiempo_limite_cambia_de_modelo():
+    import httpx
+
+    modelos = ModelosConErrores([respuesta_texto("listo")], {"lento": [httpx.ReadTimeout("90 s")]})
+    llm = ProveedorGemini(None, modelo="lento", modelos_respaldo=["rapido"], cliente=SimpleNamespace(models=modelos),
+                          max_reintentos=0)
+    assert llm.generar([Mensaje.usuario("hola")]).texto == "listo"
+    assert [p["model"] for p in modelos.peticiones] == ["lento", "rapido"]
+    assert llm._es_reintentable(httpx.ConnectError("sin red"))

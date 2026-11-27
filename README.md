@@ -35,7 +35,7 @@ cp .env.example .env               # Windows: copy .env.example .env  → y pega
 | `lupa-preguntar "¿Cuál fue la TRM promedio de octubre de 2025?"` | Pregunta desde la terminal y muestra cada paso |
 | `lupa-app` | Abre la interfaz web en http://127.0.0.1:7860 (`--share` para un enlace público) |
 | `lupa-evaluar` | Corre el banco de 12 tareas con y sin skills y genera métricas y gráfica |
-| `pytest` | Corre las 93 pruebas (sin internet ni cuota de API) |
+| `pytest` | Corre las 96 pruebas (sin internet ni cuota de API) |
 
 ### Claves
 
@@ -95,6 +95,24 @@ Como el agente no se entrena, su solidez se demuestra midiendo. `eval/tareas.jso
 - `exito_por_nivel.png`: gráfica comparativa.
 - `resultados.json`: el detalle de cada tarea, con las respuestas.
 
+### Resultados (26 de noviembre de 2026)
+
+Corrimos el banco completo **dos veces** con y sin skills: 24 ejecuciones por configuración. Las dos configuraciones corrieron una tras otra con la misma clave y la misma lista de modelos; por la cuota gratuita, en la segunda corrida casi todo lo respondió Gemini 3.5 Flash-Lite.
+
+| Métrica | Sin skills | Con skills |
+| --- | --- | --- |
+| Tareas resueltas | 71 % (17 de 24) | **88 % (21 de 24)** |
+| Tareas simples y de varios pasos | 75 % | **100 %** |
+| Tareas complejas | 62 % | 62 % |
+| Uso correcto de tools | 64 % | **95 %** |
+| Pasos por tarea | 8,9 | 7,8 |
+| Tokens por tarea | 50.637 | 36.745 (−27 %) |
+
+- **Sin skills, el agente se equivoca de fuente o se rinde:** usó SECOP Integrado (que mezcla SECOP I y II) y contó 1.337 contratos en vez de 893; eligió un conjunto parcial de Saber 11; y en las dos corridas no logró encontrar los contratos de la Secretaría de Salud. Con skills fue directo a los conjuntos verificados.
+- **Las tareas complejas no mejoraron.** La tarea C1 (“toda la Gobernación del Valle”) falló en las 4 ejecuciones: la Gobernación no es una sola entidad en SECOP II, y cada corrida decidió distinto qué dependencias sumar (de 1,27 a 1,90 billones, contra 1,53 con nuestro criterio). Las 5 dependencias principales sí salieron bien siempre.
+
+Detalle: [resumen de las dos corridas](eval/resultados/dos-corridas-20261126/resumen.md) · [última corrida combinada](eval/resultados/combinado-20261126-132628/resumen.md) · [notebook ejecutado](notebooks/02_demo_lupa_ejecutado.ipynb).
+
 ## Estructura
 
 ```text
@@ -114,7 +132,7 @@ lupa-agente/
 ├── eval/                   tareas.json, evaluar.py y resultados/
 ├── notebooks/              01_verificar_conexion.ipynb, 02_demo_lupa.ipynb
 ├── scripts/                atajos de línea de comandos
-└── tests/                  93 pruebas con pytest
+└── tests/                  96 pruebas con pytest
 ```
 
 ## Detalles técnicos que resolvimos

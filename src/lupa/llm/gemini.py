@@ -23,6 +23,8 @@ import re
 import time
 from typing import Any
 
+import httpx
+
 from google import genai
 from google.genai import errors, types
 
@@ -101,7 +103,15 @@ class ProveedorGemini(ProveedorLLM):
                     "Falta GEMINI_API_KEY. Créala en https://aistudio.google.com/apikey "
                     "y guárdala en el .env o en los secretos de Colab."
                 )
-            cliente = genai.Client(api_key=api_key)
+            # Sin esto, el SDK reintenta cada 503 hasta 5 veces (esperando hasta 60 s cada vez)
+            # y no tiene tiempo límite: con un modelo saturado la celda parece colgada.
+            # Un solo intento y 90 s como máximo; el cambio de modelo lo hace _generar.
+            cliente = genai.Client(
+                api_key=api_key,
+                http_options=types.HttpOptions(
+                    timeout=90_000, retry_options=types.HttpRetryOptions(attempts=1)
+                ),
+            )
         self.cliente = cliente
 
     # -- llamada a la API ----------------------------------------------------
@@ -130,10 +140,24 @@ class ProveedorGemini(ProveedorLLM):
                     contents=self.a_contents(mensajes, modelo),
                     config=config,
                 )
+            except httpx.TransportError as exc:
+                # Tiempo límite (90 s) o conexión caída: se trata igual que un modelo saturado.
+                siguiente = candidatos[i + 1] if i + 1 < len(candidatos) else None
+                if siguiente is None:
+                    raise
+                log.warning("%s no respondió a tiempo (%s). Pruebo con %s.", modelo, type(exc).__name__, siguiente)
+                i, ya_espero = i + 1, False
+                continue
             except errors.APIError as exc:
+                siguiente = candidatos[i + 1] if i + 1 < len(candidatos) else None
+                if exc.code == 404 and siguiente is not None:
+                    # Modelo retirado o no disponible para esta clave: se salta para siempre.
+                    self.agotados.add(modelo)
+                    log.warning("%s no existe para esta clave (error 404). Pruebo con %s.", modelo, siguiente)
+                    i, ya_espero = i + 1, False
+                    continue
                 if exc.code not in _CODIGOS_TEMPORALES:
                     raise
-                siguiente = candidatos[i + 1] if i + 1 < len(candidatos) else None
                 if exc.code == 429:
                     tipo, segundos = tipo_de_limite(exc)
                     if tipo == "diaria":
@@ -159,6 +183,8 @@ class ProveedorGemini(ProveedorLLM):
         raise AssertionError("inalcanzable")  # pragma: no cover
 
     def _es_reintentable(self, error: Exception) -> bool:
+        if isinstance(error, httpx.TransportError):
+            return True
         return isinstance(error, errors.APIError) and error.code in _CODIGOS_TEMPORALES
 
     def listar_modelos(self) -> list[str]:

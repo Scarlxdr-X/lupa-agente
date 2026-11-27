@@ -1,0 +1,28 @@
+{
+  "sin_skills": {
+    "tareas": 4,
+    "exito_total": 0.75,
+    "precision_tools": 0.8193181818181818,
+    "pasos_promedio": 11.5,
+    "errores_tool": 2,
+    "errores_recuperados": 2,
+    "tiempo_promedio_s": 71.225,
+    "tokens_promedio": 75008.75,
+    "exito_simple": null,
+    "exito_varios_pasos": null,
+    "exito_compleja": 0.75
+  },
+  "con_skills": {
+    "tareas": 4,
+    "exito_total": 0.5,
+    "precision_tools": 0.9642857142857143,
+    "pasos_promedio": 10.75,
+    "errores_tool": 1,
+    "errores_recuperados": 1,
+    "tiempo_promedio_s": 49.8,
+    "tokens_promedio": 66296.25,
+    "exito_simple": null,
+    "exito_varios_pasos": null,
+    "exito_compleja": 0.5
+  }
+}
